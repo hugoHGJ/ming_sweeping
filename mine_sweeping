@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+
+	<script src="jquery-3.2.1.js"></script>
+	<script type="text/javascript">
+		var num_boom;  //雷数
+		var n;		// n宫格
+		var last_boom;   //剩余雷数
+		var last_num;   //剩余未翻块数
+		var inGame = 0;  //0代表未开始。1代表正在进行。2代表刚刚初始化。
+		var use_time = 0;  //计算使用时间
+		var statusN;  //状态数组 0无雷，1为雷 
+		//var showNum;    //存放该位置显示的数字 0-8，-1代表有雷/10以上代表有雷
+		//var symbol_Node;
+
+		function init(num_block,get_boom)      //初始化
+		{
+			last_boom = get_boom;
+			num_boom = get_boom;
+			var set_boom = get_boom;
+			n=num_block;
+			inGame = 2;
+			last_num = n*n;
+			statusN = new Array(n+2);  //状态数组 0无雷，1为雷 
+			//showNum = new Array(n+2);    //存放该位置显示的数字 0-8，-1代表有雷/10以上代表有雷
+			//symbol_Node = new Array(n+2);
+			/*for (var i = statusN; i <n+2 ; i++) {
+				statusN[i]=new Array(n+2);
+				//showNum[i]=new Array(n+2);
+				//symbol_Node[i] = new Array(n+2);
+			}		
+			*/
+			$.each(statusN,function(key){
+				statusN[key] = new Array(n+2);
+			});
+			for (var i = 0; i < n+2; i++) {
+				for (var j = 0; j< n+2; j++) {
+					statusN[i][j] = 0;
+					//showNum[i][j] = 0;
+					//symbol_Node[i][j] = 0;
+				}
+			}	
+			for(var p=num_boom-1;p>=1;p--){
+				for(var i=1;i <= n;i++)
+				{
+					for (var j = 1; j <=n; j++) {
+						if (statusN[i][j]!= -1  && set_boom > 0 &&  Math.random()<0.2) {
+							statusN[i][j] = -1;
+							//showNum[i][j] = 10;
+							set_boom --;
+						}
+					}
+				}
+			}
+			for(var i=1;i<=n;i++)
+			{
+				for (var j = 1; j <= n; j++) {
+					if(statusN[i][j] != -1){
+						if(i > 1 && j > 1 && statusN[i - 1][j - 1] == -1) statusN[i][j] ++;
+		                if(i > 1 && statusN[i - 1][j] == -1) statusN[i][j] ++;
+		                if(i > 1 && j < n && statusN[i - 1][j + 1] == -1) statusN[i][j] ++;
+		                if(j < n && statusN[i][j + 1] == -1) statusN[i][j] ++;
+		                if(i < n && j < n && statusN[i + 1][j + 1] == -1) statusN[i][j] ++;
+		                if(i < n && statusN[i + 1][j] == -1) statusN[i][j] ++;
+		                if(i < n && j > 1 && statusN[i + 1][j - 1] == -1) statusN[i][j] ++;
+		                if(j > 1 && statusN[i][j - 1] == -1) statusN[i][j] ++;
+					}
+				}
+			}
+			var block = '';
+		    for(var i = 1; i < n + 1; i ++) {
+		        for(var j = 1; j < n + 1; j ++) {
+		            block += '<div id="b' + i + '-' + j + '" style="left:' + (j - 1) * 20 + 'px;top:' + (i - 1) * 20 + 'px;" class="hide"></div>';
+		        }
+		    }
+		    $('#sweeping').html(block).width(20*n+1).height(20*n+1).show();
+		    $('#last_boom').text(last_boom);
+		    $('#tip').show();
+		}
+
+		//获取鼠标放松事件
+		$(function(){
+			$('#sweeping').mouseup(function(e){
+				var click = $(e.target),
+				id_get = click.attr('id'),
+				click_x = parseInt(id_get.substring(1,id_get.indexOf('-'))),
+				click_y = parseInt(id_get.substring(id_get.indexOf('-')+1));
+				
+				if (inGame == 1) {
+					if(e.which == 1){
+						if (click.hasClass('hide') && !click.hasClass('flag')) {
+							onblock(click_x,click_y);
+						}
+
+						if (!click.hasClass('hide')) {
+							onNearBlock(click_x,click_y);
+						}
+					}
+					else if (e.which ==2) {
+						
+					}
+
+					else if (e.which == 3 && click.hasClass('hide')) {
+			
+						if (click.hasClass('flag')) {
+							click.removeClass('flag');
+							last_boom ++;
+							
+						}
+						else{
+							click.addClass('flag');
+							last_boom--;
+							
+						}	
+						$('#last_boom').text(last_boom);
+						if (last_num==num_boom) {
+							endGame(1);
+						}			
+					}
+
+					if (last_num==num_boom) {endGame(1);}
+				}
+				else if (inGame == 2) {
+					if (e.which == 1) {
+						onblock(click_x,click_y);
+						inGame = 1;
+						//var now_time = new Date();
+						use_time = Date.parse(new Date());
+						timelapse();
+					}
+				}
+				
+			});
+			$('#sweeping').bind('contextmenu',function(){return false;});
+		});
+
+		function onblock(x,y){     //翻块事件，如果翻到雷就结束，翻到非雷的显示周围的雷数
+			var step = $('#b' + x + '-' + y);
+			if (statusN[x][y] == -1) {
+				step.addClass('cbomb');
+				endGame(0);
+			}
+			else if (statusN[x][y] > 0) {
+				if (!step.hasClass('flag')) {
+					step.html(statusN[x][y]).addClass('num'+statusN[x][y]).removeClass('hide');     //翻块
+					last_num--;
+				}
+				else{
+					endGame(0);
+				}
+			}
+			else{  //代表周围没有雷了
+				if (step.hasClass('flag')) {
+					step.addClass('wrong');
+					endGame(0);
+				}
+				else{ //递归完成自动展开
+					step.removeClass('hide');
+					var row = statusN.length - 2;
+					last_num --;
+					var row = statusN.length-2,col=statusN[0].length-2;
+					if(x > 1 && y > 1 && $('#b' + (x - 1) + '-' + (y - 1)).hasClass('hide')) onblock(x - 1, y - 1);
+	                if(x > 1 && $('#b' + (x - 1) + '-' + y).hasClass('hide')) onblock(x - 1, y);
+	                if(x > 1 && y < col && $('#b' + (x - 1) + '-' + (y + 1)).hasClass('hide')) onblock(x - 1, y + 1);
+	                if(y < col && $('#b' + x + '-' + (y + 1)).hasClass('hide')) onblock(x, y + 1);
+	                if(x < row && y < col && $('#b' + (x + 1) + '-' + (y + 1)).hasClass('hide')) onblock(x + 1, y + 1);
+	                if(x < row && $('#b' + (x + 1) + '-' + y).hasClass('hide')) onblock(x + 1, y);
+	                if(x < row && y > 1 && $('#b' + (x + 1) + '-' + (y - 1)).hasClass('hide')) onblock(x + 1, y - 1);
+	                if(y > 1 && $('#b' + x + '-' + (y - 1)).hasClass('hide')) onblock(x, y - 1);
+           		}
+			}
+		}
+
+		function onNearBlock(x,y){   //翻周围的方块,如果插旗数等于点的数字（找到了这个点周围所有的雷）
+			var flag_num = 0,hide_num = 0;
+			for (var i = x-1; i < x+2; i++) {
+				for (var j = y-1; j < y+2 ;j++){
+					if (statusN[i][j]!= undefined) {
+						if ($('#b'+i+'-'+j).hasClass('hide')) {hide_num++;}
+						if ($('#b'+i+'-'+j).hasClass('flag')) {flag_num++;}
+					}
+					
+				}
+			}
+			if (flag_num == statusN[x][y] && hide_num > flag_num) {
+				for (var i = x-1; i < x+2; i++) {
+					for (var j = y-1; j < y+2 ;j++){
+						if ($('#b'+i+'-'+j).hasClass('hide') && statusN[i][j]>=0) {
+							onblock(i,j);
+						}
+					}
+				}
+			}
+		}
+
+		function endGame(isWin){  //游戏结束
+			inGame = 0;
+			for(var i = 1; i < n; i ++) {
+		        for(var j = 1; j < n; j ++) {
+		            if(isWin==1) {
+		                if($('#b' + i + '-' + j).hasClass('hide') && !$('#b' + i + '-' + j).hasClass('flag')) $('#b' + i + '-' + j).addClass('flag');
+		                last_boom = 0;
+		                $('#last_boom').text(last_boom);
+		            }
+		        }
+		    }
+			if (isWin == 1) {
+				alert("you win");
+			}
+			else{
+				onAllblock();
+				alert("you lose");
+			}
+		}
+
+		function onAllblock(){
+			for (var i = 1; i <= n; i++) {
+				for(var j=1;j<=n;j++){
+					var step1 = $('#b' + i + '-' + j);
+					if (statusN[i][j] == -1) {
+						step1.addClass('cbomb');
+
+					}
+					else if (statusN[i][j] > 0) {
+						step1.html(statusN[i][j]).addClass('num'+statusN[i][j]).removeClass('hide');     //翻块
+						last_num--;
+					}
+					else{
+						step1.removeClass('hide');
+					}
+				}
+			}
+		}
+
+		/*function set_N(){
+			n = document.getElementById("n_get");
+			return n;
+		}
+
+		function set_Boom(){
+			num_boom = document.getElementById("boom_get");
+			return num_boom;
+		}
+
+		function customize(){
+			var num_boom1=function set_Boom();
+			var n1=function set_N();
+			if (n!=undefined && num_boom!=undefined) {
+				init(function get_N(){return set_N();},function get_Boom(){return set_Boom();});
+			}
+			else{
+				alert("输入错误");
+			}
+		}*/
+
+		function timelapse(){
+			if (inGame == 1) {
+				//var now_time1 = new Date();
+				var now_second = Date.parse(new Date());
+				$('#time_lapse').text(Math.ceil(now_second - use_time) / 1000);
+				if (inGame == 1) {
+					setTimeout(function() {timelapse();},500);
+				}
+			}
+			else if (inGame == 2) {
+				$('#time_lapse').text('0');
+			}
+		}
+
+		function ctm(){
+			var boom_get = parseInt($('#boom_get').val());
+			var n_get = parseInt($('#n_get').val());
+			if (boom_get!=undefined && n_get!=undefined && n_get*n_get > boom_get) {
+				//alert( $('#boom_get').val());
+				init(n_get,boom_get);
+			}
+			else {
+				alert("输入错误");
+			}
+		}
+
+		function customized(){
+			var sign =document.getElementById('custom');
+			if (sign.style.display == 'none'){
+				document.getElementById('custom').style.display = 'block';
+			}
+			else{
+				document.getElementById('custom').style.display = 'none';
+			}
+		}
+
+	</script>
+	<style type="text/css">
+		body{background:#fff;font-size:14px;}
+		#tip{display:none;}
+		#warning{color:#ff0000;}
+		#sweeping{background:#ddd;border:1px solid #888;display:none;position:relative;}
+		#sweeping div{border:1px solid #888;font-weight:bold;height:19px;height:21px\9;line-height:18px;cursor:default;position:absolute;text-align:center;width:19px;width:21px\9;}
+		.hide{background:url(mine.gif) 0 0;}
+		.flag{background:url(mine.gif) -19px 0;}
+		.check{background:url(mine.gif) -38px 0;}
+		.bomb{background:url(mine.gif) -57px 0;}
+		.cbomb{background:url(mine.gif) -57px 0 #ff0000;}
+		.wrong{background:url(mine.gif) -76px 0;}
+		.num1{color:#0000ff;}
+		.num2{color:#008000;}
+		.num3{color:#ff0000;}
+		.num4{color:#000080;}
+		.num5{color:#800000;}
+		.num6{color:#008080;}
+		.num7{color:#000000;}
+		.num8{color:#808080;}
+	</style>
+</head>
+<body>
+	<div id="menu">
+		<a href="javascript:;" onclick="init(9,10)">常规9*9和10雷开始</a><br>
+		<a href="javascript:;" onclick="customized()">我想自定义开始</a>
+		<div id="custom" style="display: none;">
+			<input type="text" name="n_get" id="n_get" placeholder="请输入想玩 宫格"><br>
+			<input type="text" name="boom_get" id="boom_get" placeholder="请设置雷数"><br>
+			<a href="javascript:;" onclick="ctm()">自定义开始</a> 
+		</div>
+		
+	</div>
+	<div id="tip">
+		剩余雷数：<span id="last_boom"></span>
+		使用时间：<span id="time_lapse"></span>
+	</div>
+	<div id="sweeping">
+		
+	</div>
+</body>
+</html>
